@@ -3,7 +3,9 @@
 <!-- PROJECT LOGO -->
 <br>
 <br>
-![](https://www1.icsi.berkeley.edu/wcs/images/jrus-20100531/wcs-chart-4x.png)
+<p align="center">
+<img src="https://www1.icsi.berkeley.edu/wcs/images/jrus-20100531/wcs-chart-4x.png" width="800">
+</p>
 <br>
 <!-- ABOUT THE PROJECT -->
 
