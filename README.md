@@ -5,8 +5,7 @@
 <br>
 <p align="center">
 <img src="https://www1.icsi.berkeley.edu/wcs/images/jrus-20100531/wcs-chart-4x.png" width="600">  
-   
-<center><small> &#169 <a href="https://www1.icsi.berkeley.edu/wcs/">The World Color Survey</a> </small></center>
+<p align="center"><small> &#169 <a href="https://www1.icsi.berkeley.edu/wcs/">The World Color Survey</a> </small></center></p>
 </p>
 <br>
 <!-- ABOUT THE PROJECT -->
