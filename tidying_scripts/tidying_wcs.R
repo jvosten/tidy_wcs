@@ -52,22 +52,22 @@ dl <- c(dl[1], list("cnum-vhcm-lab-new.txt" = readr::read_tsv(url2, col_names = 
 
 # Version 2 -------------------------------------------------------------------------------------------------------------------- #
 
-# Create a path list to the data: add the path to directory you unpacked the zip in and where you stored cnum-vhcm-lab-new.txt
-list_of_files <- list.files(path = "./WCS_data", recursive = TRUE,
-                            pattern = "\\.txt$", 
-                            full.names = TRUE)
-
-# Removes the readme of cnum-vhcm-lab-new.txt, if it is in the directory
-list_of_files <- subset(list_of_files, !endsWith(list_of_files, "README.txt"))
-
-# Read in data into a list of data frames (dfl)
-dl <- list_of_files %>%
-  #set_names(.) %>%
-  purrr::map(read_tsv, col_names = FALSE) 
-
-# Move foci data in its own object
-foci <- dl[[5]]
-dl <- dl[-5]
+# # Create a path list to the data: add the path to directory you unpacked the zip in and where you stored cnum-vhcm-lab-new.txt
+# list_of_files <- list.files(path = "./wcs_data", recursive = TRUE,
+#                             pattern = "\\.txt$",
+#                             full.names = TRUE)
+# 
+# # Removes the readme of cnum-vhcm-lab-new.txt, if it is in the directory
+# list_of_files <- subset(list_of_files, !endsWith(list_of_files, "README.txt"))
+# 
+# # Read in data into a list of data frames (dfl)
+# dl <- list_of_files %>%
+#   #set_names(.) %>%
+#   purrr::map(read_tsv, col_names = FALSE)
+# 
+# # Move foci data in its own object
+# foci <- dl[[5]]
+# dl <- dl[-5]
 
 
 # Name all Variables of each df-------------------------------------------------------------------------------------------------- #
@@ -263,7 +263,7 @@ dl$foci_exp <- dl$foci_exp %>%
 
 ## dl$term ---------------------------------------------------------------------------------------------------------------------- # 
 
-# Recoding NA values fpr term_abb
+# Recoding NA values for term_abb
 dl$term <- dl$term %>%
   dplyr::mutate(term_abb = na_if(term_abb, "*"),
                 term_abb = na_if(term_abb, "?"))

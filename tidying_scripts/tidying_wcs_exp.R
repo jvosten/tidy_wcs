@@ -22,65 +22,73 @@ library(tidyverse)
 
 # Read in data ***************************************************************************************************************** #
 
+# Version 1: web --------------------------------------------------------------------------------------------------------------- #
 
-# Version 1 -------------------------------------------------------------------------------------------------------------------- #
+read_web <- function(){
+  # Urls for all files of interes
+  url <-"https://www1.icsi.berkeley.edu/wcs/data/20041016/WCS-Data-20110316.zip"
+  url2 <- "https://www1.icsi.berkeley.edu/wcs/data/cnum-maps/cnum-vhcm-lab-new.txt"
+  
+  # Creating temporary files
+  temp <- tempfile()
+  temp2 <- tempfile()
+  
+  # Store and unzip 
+  download.file(url, temp)
+  unzip(zipfile = temp, exdir = temp2)
+  
+  # Create a path list to the data
+  list_of_files <- list.files(path = temp2, recursive = TRUE,
+                              pattern = "\\.txt$",
+                              full.names = TRUE)
+  
+  # Read in data into a list of data frames (dfl)
+  custom_reader <- function(x){
+    if(endsWith(x, "foci-exp.txt")){
+      readr::read_table(x, col_names = FALSE)
+    }else{
+      readr::read_tsv(x, col_names = FALSE)
+    }
+  }
+  
+  # Read in data into a list of data frames (dfl)
+  dl <- list_of_files %>%
+    purrr::set_names(.) %>%
+    purrr::map(., custom_reader)
+  
+  # Remove temp files 
+  unlink(c(temp, temp2), recursive = TRUE)
+  
+  # Move foci data in its own object and force it into global env
+  foci <<- dl[[4]]
+  dl <- dl[-4]
+  
+  # Read in the last txt file and add it to dfl
+  dl <- c(dl[1], list("cnum-vhcm-lab-new.txt" = readr::read_tsv(url2, col_names = FALSE)), dl[2:6])
+}
 
-# Urls for all files of interes
-url <-"https://www1.icsi.berkeley.edu/wcs/data/20041016/WCS-Data-20110316.zip"
-url2 <- "https://www1.icsi.berkeley.edu/wcs/data/cnum-maps/cnum-vhcm-lab-new.txt"
+dl <- read_web()
 
-# Creating temporary files
-temp <- tempfile()
-temp2 <- tempfile()
+# Version 2: local ------------------------------------------------------------------------------------------------------------- #
 
-# Store and unzip 
-download.file(url, temp)
-unzip(zipfile = temp, exdir = temp2)
+# # Create a path list to the data: add the path to directory you unpacked the zip in and where you stored cnum-vhcm-lab-new.txt
+# list_of_files <- list.files(path = "./WCS_data", recursive = TRUE,
+#                             pattern = "\\.txt$", 
+#                             full.names = TRUE)
+# 
+# # Removes the readme of cnum-vhcm-lab-new.txt, if it is in the directory
+# list_of_files <- subset(list_of_files, !endsWith(list_of_files, "README.txt"))
+# 
+# # Read in data into a list of data frames (dfl)
+# dl <- list_of_files %>%
+#   #set_names(.) %>%
+#   map(read_tsv, col_names = FALSE) 
+# 
+# # Move foci data in its own object
+# foci <- dl[[5]]
+# dl <- dl[-5]
 
-# Create a path list to the data
-list_of_files <- list.files(path = temp2, recursive = TRUE,
-                            pattern = "\\.txt$",
-                            full.names = TRUE)
-
-# Read in data into a list of data frames (dfl)
-dl <- list_of_files %>%
-  set_names(.) %>%
-  map(read_tsv, col_names = FALSE)
-
-# Remove temp files 
-unlink(c(temp, temp2))
-
-# Move foci data in its own object
-foci <- dl[[4]]
-dl <- dl[-4]
-
-# Read in the last txt file and add it to dfl
-dl <- c(dl[1], list("cnum-vhcm-lab-new.txt" = read_tsv(url2, col_names = FALSE)), dl[2:6])
-
-# Name each df in dfl
-names(dl) <- c("chip",
-               "dict", "foci_exp",
-               "lang", "speaker",
-               "term", "mun_2_lab")
-
-# Version 2 -------------------------------------------------------------------------------------------------------------------- #
-
-# Create a path list to the data: add the path to directory you unpacked the zip in and where you stored cnum-vhcm-lab-new.txt
-list_of_files <- list.files(path = "./WCS_data", recursive = TRUE,
-                            pattern = "\\.txt$", 
-                            full.names = TRUE)
-
-# Removes the readme of cnum-vhcm-lab-new.txt, if it is in the directory
-list_of_files <- subset(list_of_files, !endsWith(list_of_files, "README.txt"))
-
-# Read in data into a list of data frames (dfl)
-dl <- list_of_files %>%
-  #set_names(.) %>%
-  map(read_tsv, col_names = FALSE) 
-
-# Move foci data in its own object
-foci <- dl[[5]]
-dl <- dl[-5]
+# Name all Variables of each df ------------------------------------------------------------------------------------------------ #
 
 # Name each df in dfl
 names(dl) <- c("chip", "mun_2_lab", 
@@ -88,24 +96,38 @@ names(dl) <- c("chip", "mun_2_lab",
                "lang", "speaker", 
                "term") 
 
-# Name all Variables of each df ------------------------------------------------------------------------------------------------ #
-
-colnames(dl$chip) <- c("chip_nr", "grid_row", "grid_col", "grid_coord")
-colnames(dl$mun_2_lab) <- c("chip_nr", "wcs_mv", "wcs_mh", "mun_chroma", 
-                            "mun_hue", "mun_value", "L_star", "a_star", "b_star")
-colnames(dl$dict) <- c("lang_nr", "term_nr", "term", "term_abb")
-colnames(dl$foci_exp) <- c("lang_nr", "speaker_nr", "focus_response", "term_abb", "grid_coord")
-colnames(dl$lang) <- c("lang_nr", "lang_name", "lang_country", "field_worker", "field_worker_2", "field_worker_3", 
+# set all variable names
+colnames(dl$chip) <- c("chip_nr", "grid_row", "grid_col", 
+                       "grid_coord")
+colnames(dl$mun_2_lab) <- c("chip_nr", "wcs_mv", "wcs_mh", 
+                            "mun_chroma", "mun_hue", "mun_value", 
+                            "L_star", "a_star", "b_star")
+colnames(dl$dict) <- c("lang_nr", "term_nr", "term", 
+                       "term_abb")
+colnames(dl$foci_exp) <- c("lang_nr", "speaker_nr", "focus_response", 
+                           "term_abb", "grid_coord")
+colnames(dl$lang) <- c("lang_nr", "lang_name", "lang_country", 
+                       "field_worker", "field_worker_2", "field_worker_3", 
                        "Orig_file", "File_type")
-colnames(dl$speaker) <- c("lang_nr", "speaker_nr", "speaker_age", "speaker_sex") 
-colnames(dl$term) <- c("lang_nr", "speaker_nr", "chip_nr", "term_abb")
+colnames(dl$speaker) <- c("lang_nr", "speaker_nr", "speaker_age", 
+                          "speaker_sex") 
+colnames(dl$term) <- c("lang_nr", "speaker_nr", "chip_nr", 
+                       "term_abb")
 
+# colnames for the additional foci file
+colnames(foci) <- c("lang_nr", "speaker_nr", "focus_response", 
+                           "term_abb", "grid_coord")
+
+# Two data frames had column names, which turned into the first row now; we delete them
 dl$mun_2_lab <- dl$mun_2_lab[-1,]
 dl$dict <- dl$dict[-1,]
 
+# Empty list for plots
+plots <- list()
+
 # Overview on variable description --------------------------------------------------------------------------------------------- #
 
-vars <- tibble("WCS Variable Name" = c("WCS Chip Number", "WCS Grid Row", "WCS Grid Columns", "Concatenation of fields", #1
+vars <- tibble::tibble("WCS Variable Name" = c("WCS Chip Number", "WCS Grid Row", "WCS Grid Columns", "Concatenation of fields", #1
                                        "V", "H", "C", "MunH", "MunV", "L*", "a*", "b*", #2
                                        "WCS Language Number", "Term Number", "Term", "Term Abbreviation", #3
                                        "WCS Speaker Number", "WCS Focus Response", #4
@@ -140,33 +162,33 @@ vars <- tibble("WCS Variable Name" = c("WCS Chip Number", "WCS Grid Row", "WCS G
 # Overview about all row and column length-------------------------------------------------------------------------------------- #
 
 ov <- dl %>%
-  map_df(ncol)
+  purrr::map_df(ncol)
 ov[2,] <- dl %>%
-  map_dfr(nrow)
+  purrr::map_dfr(nrow)
 
 # Function for Stat summary----------------------------------------------------------------------------------------------------- #
 
-my_skim <- skim_with(
-  numeric = sfl(complete_rate = NULL, 
+my_skim <- skimr::skim_with(
+  numeric = skimr::sfl(complete_rate = NULL, 
                 p25 = NULL, 
                 p50 = NULL, 
                 p75 = NULL, 
                 hist = NULL),
-  character = sfl(empty = NULL,
+  character = skimr::sfl(empty = NULL,
                   whitespace = NULL)
 )
 
 # Print function for markdown
 skim_print <- function(df){
-  m <- if_else(all(map_lgl(df, is.character)), 7, 11)
+  m <- dplyr::if_else(all(purrr::map_lgl(df, is.character)), 7, 11)
   
   my_skim(df) %>% 
-    as_tibble() %>% 
-    rename_with(., ~ gsub("character", "char", .x, fixed = TRUE), starts_with("char")) %>% 
-    rename_with(., ~ gsub("numeric", "num", .x, fixed = TRUE), starts_with("num")) %>% 
-    select(variable = skim_variable, data_type = skim_type, 3, all_of(5:m)) %>%
-    mutate(mutate(across(where(is.numeric), round, digits = 1)),
-           across(everything(), as.character)) %>% 
+    tibble::as_tibble() %>% 
+    dplyr::rename_with(., ~ gsub("character", "char", .x, fixed = TRUE), dplyr::starts_with("char")) %>% 
+    dplyr::rename_with(., ~ gsub("numeric", "num", .x, fixed = TRUE), dplyr::starts_with("num")) %>% 
+    dplyr::select(variable = skim_variable, data_type = skim_type, 3, all_of(5:m)) %>%
+    dplyr::mutate(dplyr::mutate(dplyr::across(where(is.numeric), round, digits = 1)),
+                  dplyr::across(dplyr::everything(), as.character)) %>% 
     replace(is.na(.), "-")  # Noch die digits begrenzen
 }
 
@@ -180,17 +202,17 @@ skim_print(dl$chip)
 
 # Change vars in factors
 dl$chip <- dl$chip %>%
-  mutate(across(c(grid_row, grid_coord), as.factor))
+  dplyr::mutate(dplyr::across(c(grid_row, grid_coord), as.factor))
 
 ### dl$mun_2_lab --------------------------------------------------------------------------------------------------------------- # 
 
 my_skim(dl$mun_2_lab)
-# Looks good; since nrow = 330 there is no need for validate rules
+# Looks good; since nrow = 330 
 
 # Make all vars numeric or factor
 dl$mun_2_lab <- dl$mun_2_lab %>%
-  mutate(across(!c(wcs_mv, mun_hue), as.numeric),
-         across(c(wcs_mv, mun_hue), as.factor))
+  dplyr::mutate(dplyr::across(!c(wcs_mv, mun_hue), as.numeric),
+                dplyr::across(c(wcs_mv, mun_hue), as.factor))
 
 # Test, if factor variables have the right amount of levels
 length(levels(dl$mun_2_lab$wcs_mv))
@@ -203,8 +225,8 @@ my_skim(dl$lang)
 # variables, as they are sort of meta data.
 
 dl$lang <- dl$lang %>% 
-  select(lang_nr, lang_name, lang_country) %>%
-  mutate(lang_country = na_if(lang_country, "*"))
+  dplyr::select(lang_nr, lang_name, lang_country) %>%
+  dplyr::mutate(lang_country = na_if(lang_country, "*"))
 
 # At this point we drop the variables author, file and file status; if there is an interest in those files, the above selection
 # function can be replaced wit the following:
@@ -214,28 +236,35 @@ dl$lang <- dl$lang %>%
 
 # Since half of the country names are missing and some languages contain special characters which cause problems when displaying
 # the data, we use the "ISO 639-3 codes" file from the "Primary WCS Data" section of the archive and substitute lang_name and
-# lang_country with values from that file.
+# lang_country with values from that file by substituting the old dl$lang data frame with the newly created one
 
 # Downloading the additional table, transforming the html table into R data frame 
-url3 <- "https://www1.icsi.berkeley.edu/wcs/WCS_SIL_codes.html"
-file <- read_html(url3)
-tables <- html_nodes(file, "table")
-wcs_iso_codes <- as_tibble(html_table(tables[[1]], fill = TRUE)) %>%
-  rename(lang_nr = Index, 
-         lang_name = Language, 
-         iso_693 = `ISO 639-3 Code`, 
-         family = Family, 
-         lang_country = `Country Where`) %>%
-  mutate(lang_country = recode(lang_country, `Mexico|` = "Mexico",
-                               `Columbia` = "Colombia",
-                               `Indonesia (Irian Jaya)` = "Indonesia",
-                               `Peru, Brazil` = "Peru",
-                               `USA, Mexico` = "Mexico",
-                               `Nigeria, Cameroon` = "Nigeria"))
+wcs_iso_codes <- function() {  
+  url3 <- "https://www1.icsi.berkeley.edu/wcs/WCS_SIL_codes.html"
+  file <- xml2::read_html(url3)
+  tables <- rvest::html_nodes(file, "table")
+  
+  codes <- 
+    tibble::as_tibble(rvest::html_table(tables[[1]], fill = TRUE)) %>%
+    dplyr::rename(lang_nr = Index, 
+                  lang_name = Language, 
+                  iso_693 = `ISO 639-3 Code`, 
+                  family = Family, 
+                  lang_country = `Country Where`) %>%
+    dplyr::mutate(lang_country = dplyr::recode(lang_country, 
+                                               `Mexico|` = "Mexico",
+                                               `Columbia` = "Colombia",
+                                               `Indonesia (Irian Jaya)` = "Indonesia",
+                                               `Peru, Brazil` = "Peru",
+                                               `USA, Mexico` = "Mexico",
+                                               `Nigeria, Cameroon` = "Nigeria")
+                )
+  return(codes)
+}
 
-# Substitute the variables
-dl$lang <- wcs_iso_codes %>%
-  select(lang_nr, lang_name, lang_country)
+# Substitute the data frames
+dl$lang <- wcs_iso_codes() %>%
+  dplyr::select(lang_nr, lang_name, lang_country)
 
 ### dl$speaker ----------------------------------------------------------------------------------------------------------------- # 
 
@@ -245,30 +274,30 @@ my_skim(dl$speaker)
 
 # filter, which other values then M and F are contained in speaker_sex
 dl$speaker %>% 
-  filter(!speaker_sex %in% c("M","F")) %>%
-  distinct(speaker_sex)
+  dplyr::filter(!speaker_sex %in% c("M","F")) %>%
+  dplyr::distinct(speaker_sex)
 
 # Frequency distribution for all values of speaker_sex
 dl$speaker %>% 
-  select(speaker_sex) %>% 
+  dplyr::select(speaker_sex) %>% 
   table()
 
 # Frequency distribution of non male/female values in speaker sex 
 dl$speaker %>% 
-select(speaker_sex) %>% 
+  dplyr::select(speaker_sex) %>% 
   table() %>% 
-  as_tibble() %>%
-  rename(term = ".") %>%
-  rename(Freq = "n") %>%
-  mutate(term = as.factor(term)) %>% 
-  ggplot(aes(x = term, y = Freq)) +
-  geom_col(fill = "#4271AE", width = 0.6, alpha = 0.8, color = "#4271AE") + 
+  tibble::as_tibble() %>%
+  dplyr::rename(term = ".") %>%
+  dplyr::rename(Freq = "n") %>%
+  dplyr::mutate(term = as.factor(term)) %>% 
+  ggplot2::ggplot(aes(x = term, y = Freq)) +
+  ggplot2::geom_col(fill = "#4271AE", width = 0.6, alpha = 0.8, color = "#4271AE") + 
   #scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
-  coord_fixed(1/500)
+  ggplot2::coord_fixed(1/500)
 
 # Recode values either to M,F or missing
 dl$speaker <- dl$speaker %>%
-  mutate(speaker_sex = case_when(speaker_sex == "m" ~ "M",
+  dplyr::mutate(speaker_sex = dplyr::case_when(speaker_sex == "m" ~ "M",
                                  speaker_sex == "FA" ~ "F",
                                  speaker_sex == "f" ~ "F",
                                  speaker_sex == "?" ~ NA_character_,
@@ -280,26 +309,28 @@ dl$speaker <- dl$speaker %>%
 
 # The frequency table for non-numeric values in speaker_age
 dl$speaker%>% 
-  filter(!speaker_age %in% 1:99) %>% select(speaker_age) %>% table()
+  dplyr::filter(!speaker_age %in% 1:99) %>% 
+  dplyr::select(speaker_age) %>% 
+  table()
 
 # and the plot of this table
 dl$speaker %>% 
-  filter(!speaker_age %in% 1:99) %>% 
-  select(speaker_age) %>% 
+  dplyr::filter(!speaker_age %in% 1:99) %>% 
+  dplyr::select(speaker_age) %>% 
   table() %>% 
-  as_tibble() %>%
-  rename(term = ".") %>%
-  rename(Freq = "n") %>%
-  mutate(term = as.factor(term)) %>% 
-  ggplot(aes(x = term, y = Freq)) +
-  geom_col(fill = "#4271AE", width = 0.6) + 
-  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
-  coord_fixed(1/10) +
-  theme_bw()
+  tibble::as_tibble() %>%
+  dplyr::rename(term = ".") %>%
+  dplyr::rename(Freq = "n") %>%
+  dplyr::mutate(term = as.factor(term)) %>% 
+  ggplot2::ggplot(aes(x = term, y = Freq)) +
+  ggplot2::geom_col(fill = "#4271AE", width = 0.6) + 
+  ggplot2::scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  ggplot2::coord_fixed(1/10) +
+  ggplot2::theme_bw()
 
 # Change all non-number values in missing
 dl$speaker <- dl$speaker %>%
-  mutate(speaker_age = case_when(speaker_age == "?" ~ NA_character_,
+  dplyr::mutate(speaker_age = dplyr::case_when(speaker_age == "?" ~ NA_character_,
                                  speaker_age == "??" ~ NA_character_,
                                  speaker_age == "*" ~ NA_character_,
                                  speaker_age == "0" ~ NA_character_,
@@ -322,13 +353,13 @@ my_skim(dl$dict)
 
 # The first issue is solved easily:
 dl$dict <- dl$dict %>%
-  mutate(across(c(lang_nr, term_nr), as.numeric))
+  dplyr::mutate(dplyr::across(c(lang_nr, term_nr), as.numeric))
 
 # Issue II & III ---------------------------------------------------------------------------------------------------------------- #
 
 # Second and third issue are related, as we can easyly show by looking at the missing values of term_abb:
 dl$dict %>%
-  filter(is.na(term))# %>% print(n = Inf)
+  dplyr::filter(is.na(term))# %>% print(n = Inf)
 
 # From this table we can draw 2 conclusions:
 # 1. The missing term_abb values are relatively even spread over all languages, there is no clustering for a single language.
@@ -344,13 +375,16 @@ dl$dict %>%
 
 # Before we correct the values for term_abb and term we store the lang_nr which have missing values for term_abb in a vector, 
 # because the term_abb problem will recur later and we'll use this vector for comparison
-na_lang <- dl$dict %>%
-  filter(is.na(term_abb)) %>%
-  select(lang_nr)
+na_lang <- function(){
+  dl$dict %>%
+  dplyr::filter(is.na(term_abb)) %>%
+  dplyr::select(lang_nr) %>%
+  pull()
+}
 
 # We can then reduce the missing term_abb to 4 values and missing term to 9, with an intersection of 4
 dl$dict <- dl$dict %>%  
-  mutate(term_abb = case_when(term == "'ndaa" ~ "ND", # This recodes the missing term_abb which have a corresponding term
+  dplyr::mutate(term_abb = dplyr::case_when(term == "'ndaa" ~ "ND", # This recodes the missing term_abb which have a corresponding term
                               term == "namonsitihante" ~ "NM",
                               term == "naatuca" ~ "NT",
                               term == "anaranjada/naranjada" ~ "AN",
@@ -368,14 +402,14 @@ dl$dict <- dl$dict %>%
                               term == "ñiro" ~ "NI",
                               TRUE ~ term_abb),
          # This cleans the terms, which are missing
-         term = case_when(term == "??" ~ NA_character_,
-                          term == "blank" ~ NA_character_,
-                          TRUE ~ term),
+         term = dplyr::case_when(term == "??" ~ NA_character_,
+                                 term == "blank" ~ NA_character_,
+                                 TRUE ~ term),
          # this cleans the two term_abb, which are '??'
-         term_abb = case_when(term == is.na(term) ~ NA_character_,
-                              term == "welee" ~ "WE",
-                              term_abb == "??" ~ NA_character_,
-                              TRUE ~ term_abb)
+         term_abb = dplyr::case_when(term == is.na(term) ~ NA_character_,
+                                     term == "welee" ~ "WE",
+                                     term_abb == "??" ~ NA_character_,
+                                     TRUE ~ term_abb)
   )       
 
 # For issue two and three we look at the frequency distribution of term and term_abb variables which appear more then once
@@ -383,71 +417,96 @@ dl$dict <- dl$dict %>%
 # Function to filter duplicates of a variable within a single language; if option l = TRUE, the function returns the language 
 # number instead of the values of the inserted variable
 non_u_fun <- function(var, l = FALSE) {
-  w <- dl$dict %>% 
-    group_by(lang_nr, {{var}}) %>%
-    mutate(duplicate.flag = n() > 1) %>%
-    filter(duplicate.flag == TRUE) 
+  df <- dl$dict %>% 
+    dplyr::group_by(lang_nr, {{var}}) %>%
+    dplyr::mutate(duplicate.flag = n() > 1) %>%
+    dplyr::filter(duplicate.flag == TRUE) 
   
   if(l == TRUE){
-    w %>% 
-      filter(duplicate.flag == TRUE) %>%
-      ungroup() %>%
-      distinct(lang_nr)
+    df %>% 
+      dplyr::filter(duplicate.flag == TRUE) %>%
+      dplyr::ungroup() %>%
+      dplyr::distinct(lang_nr)
   }else{
-    w %>% 
-      select({{var}}, duplicate.flag) %>% 
+    df %>% 
+      dplyr::select({{var}}, duplicate.flag) %>% 
       unique() %>% 
       pull({{var}})
   }
 }
 
-# Plot for the frequency distribution of term
-dict_freq_term <- dl$dict %>% 
-  group_by(term) %>% 
-  mutate(duplicate.flag = n() > 1) %>% 
-  filter(duplicate.flag) %>%
-  arrange(term) %>%
-  select(term) %>% 
-  table() %>%
-  as_tibble() %>%
-  rename(term = ".") %>%
-  rename(freq = "n") %>%
-  mutate(term = as.factor(term),
-         non_u = as_factor(if_else(term %in% non_u_fun(term), "Non-unique", "Unique"))) %>% 
-  ggplot(aes(x = term, y = freq, colour = non_u)) + 
-  geom_point() +
-  scale_x_discrete(expand=c(0,0),breaks=c("ami", "cafe", "gihobuna", "lal", "pink", "solferino")) +
-  scale_colour_manual(values = c("#4271AE","#FF6347"))
+dict_plots <- function() {
+  # Plot for the frequency distribution of term
+  plot1 <- function() {
+    dl$dict %>% 
+    group_by(term) %>% 
+    mutate(duplicate.flag = n() > 1) %>% 
+    filter(duplicate.flag) %>%
+    arrange(term) %>%
+    select(term) %>% 
+    table() %>%
+    as_tibble() %>%
+    rename(term = ".") %>%
+    rename(freq = "n") %>%
+    mutate(term = as.factor(term),
+           non_u = as_factor(if_else(term %in% non_u_fun(term), "Non-unique", "Unique"))) %>% 
+    ggplot(aes(x = term, y = freq, colour = non_u)) + 
+    geom_point() +
+    scale_x_discrete(expand=c(0,0),breaks=c("ami", "cafe", "gihobuna", "lal", "pink", "solferino")) +
+    scale_colour_manual(values = c("#4271AE","#FF6347"))
+  }
+  
+  # Plot for the frequency distribution of term_abb
+ 
+  plot2 <- function() {
+    br <- dl$dict %>%
+      select(term_abb) %>%
+      distinct() %>%
+      arrange(term_abb) 
+    breaks <- function() br[as.integer(seq(1, nrow(br), nrow(br)/10)),] %>% pull()
+    
+    dl$dict %>% 
+    group_by(term_abb) %>%                   
+    mutate(duplicate.flag = n() > 1) %>% 
+    filter(duplicate.flag) %>%
+    arrange(term) %>%
+    select(term_abb) %>% 
+    table() %>%
+    as_tibble() %>%
+    rename(term_abb = ".") %>%
+    rename(freq = "n") %>%
+    mutate(term_abb = as.factor(term_abb), 
+           non_u_lang = as_factor(if_else(term_abb %in% non_u_fun(term_abb), 
+                                          "Non-unique", "Unique"))
+           ) %>%
+    ggplot(aes(x = term_abb, y = freq, colour = non_u_lang)) + 
+    geom_point() +
+    scale_x_discrete(expand=c(0,0),breaks=breaks()) + 
+    scale_colour_manual(values = c("#4271AE","#FF6347"))
+  }
+  
+  list(
+    dict_freq_dist_term = plot1,
+    dict_freq_dist_term_abb = plot2
+  )
+}
 
-# Plot for the frequency distribution of term_abb
-br <- dl$dict %>%
-  select(term_abb) %>%
-  distinct() %>%
-  arrange(term_abb) 
-br <- br[as.integer(seq(1, 535, 535/10)),] %>% pull()
+plots <- append(plots, dict_plots())
 
-dict_freq_term_abb <- dl$dict %>%  # auf den Plot evtl noch einen fill setzen, der binär anzeigt, ob eine doppelung in 
-  group_by(term_abb) %>%                   # einer sprache vorliegt
-  mutate(duplicate.flag = n() > 1) %>% 
-  filter(duplicate.flag) %>%
-  arrange(term) %>%
-  select(term_abb) %>% 
-  table() %>%
-  as_tibble() %>%
-  rename(term_abb = ".") %>%
-  rename(freq = "n") %>%
-  mutate(term_abb = as.factor(term_abb), 
-         non_u_lang = as_factor(if_else(term_abb %in% non_u_fun(term_abb), "Non-unique", "Unique"))) %>%
-  ggplot(aes(x = term_abb, y = freq, colour = non_u_lang)) + 
-  geom_point() +
-  scale_x_discrete(expand=c(0,0),breaks=br) + 
-  scale_colour_manual(values = c("#4271AE","#FF6347"))
+# c[["d"]] <- a$dict_freq_dist_term
+# plots$b <- a$dict_freq_dist_term_abb
+
+#
+# plapp <- function(plist, plots) {
+#   plts <- plots 
+#   map(plts)
+#}
 
 # Duplicates of term and term_abb in language 12
 dl$dict %>% group_by(lang_nr, term) %>%
-  filter(lang_nr == 12) %>%
-  mutate(duplicate.flag = n() > 1) %>%
-  filter(duplicate.flag == T) %>%
+  dplyr::filter(lang_nr == 12) %>%
+  dplyr::mutate(duplicate.flag = n() > 1) %>%
+  dplyr::filter(duplicate.flag == T) %>%
   head(n=4)
 
 ### dl$foci_exp ---------------------------------------------------------------------------------------------------------------- # 
@@ -466,91 +525,98 @@ my_skim(dl$foci_exp)
 # Function to calculate the mean of focus_response per speaker for each language
 grouped_mean <- function(var){
   dl$foci_exp %>% 
-    group_by(lang_nr, speaker_nr) %>% 
-    distinct({{var}}) %>% 
+    dplyr::group_by(lang_nr, speaker_nr) %>% 
+    dplyr::distinct({{var}}) %>% 
     count() %>% 
-    group_by(lang_nr) %>%
-    summarise(mean_lang = mean(n),
-              sd = sd(n))
+    dplyr::group_by(lang_nr) %>%
+    dplyr::summarise(mean_lang = mean(n),
+                     sd = sd(n))
 }
 
 # Check the mean for term_abb
 grouped_mean(term_abb)
 
-# See highest stanadard deviation
+# See highest standard deviation
 grouped_mean(focus_response) %>% 
-  arrange(sd) %>% 
+  dplyr::arrange(sd) %>% 
   tail()
 
 # I Grid_coord Problem --------------------------------------------------------------------------------------------------------- #
 
 # Creates a vector with the grid coordinates of the Munsell chart
-grid_coordinates <- LETTERS[2:9] %>%
-    map(paste0, 0:40) %>% 
-    flatten_chr() %>% 
+grid_coordinates <- function() {
+  LETTERS[2:9] %>%
+    purrr::map(paste0, 0:40) %>% 
+    purrr::flatten_chr() %>% 
     c("A0", ., "J0")
+}
 
 # Filter all values in foci_exp of grid_coord, which are not in the above vector
 dl$foci_exp %>%
-  filter(!grid_coord %in% grid_coordinates) %>% 
-  select(grid_coord) %>% 
+  dplyr::filter(!grid_coord %in% grid_coordinates()) %>% 
+  dplyr::select(grid_coord) %>% 
   unique() %>% 
   print(n = Inf)
 
 # Plot for the distribution of the excess grid coordinate values 
-dat <- dl$foci_exp %>% # graph noch optimieren
-  filter(!grid_coord %in% grid_coordinates) %>%
-  select(grid_coord, lang_nr) %>%
-  mutate(lang_nr = as.factor(lang_nr))
-
-br <- (unique(dat$lang_nr)[seq(1, 77, 5)])
-
-ggplot(dat, aes(grid_coord, fill = lang_nr)) +
-  geom_bar() +
-  scale_y_continuous(expand=c(0,0), name = "Freq") +
-  scale_x_discrete(expand=c(0,0),breaks=c("A10", "A20", "A30", "A40",
-                                          "J10", "J20", "J30", "J40")) +
-  scale_fill_viridis_d(breaks = br) +
-  theme(
-    legend.title = element_text(size = 10),
-    legend.text = element_text(size = 8),
-    #legend.position = "bottom",
-    legend.key.size = unit(0.5, "cm")
-  ) #+
-#guides(fill = guide_legend(nrow = 2))
-rm(dat)
+foci_plot1 <- function() {  
+  dat <- function()
+    dl$foci_exp %>% # graph noch optimieren
+    filter(!grid_coord %in% grid_coordinates()) %>%
+    select(grid_coord, lang_nr) %>%
+    mutate(lang_nr = as.factor(lang_nr))
+  
+  br <- (unique(dat()$lang_nr)[seq(1, 77, 5)])
+  
+  ggplot(dat(), aes(grid_coord, fill = lang_nr)) +
+    geom_bar() +
+    scale_y_continuous(expand=c(0,0), name = "Freq") +
+    scale_x_discrete(expand=c(0,0),breaks=c("A10", "A20", "A30", "A40",
+                                            "J10", "J20", "J30", "J40")) +
+    scale_fill_viridis_d(breaks = br) +
+    theme(
+      legend.title = element_text(size = 10),
+      legend.text = element_text(size = 8),
+      #legend.position = "bottom",
+      legend.key.size = unit(0.5, "cm")
+    ) #+
+    #guides(fill = guide_legend(nrow = 2))
+}
+  
+plots$foci_dist_exec_gc <- foci_plot1
 
 # Row  numbers of original foci file
 nrow(foci)
 
 # Filter foci for additional grid coordinates
 foci %>%
-  filter(!grid_coord %in% grid_coordinates) %>% 
-  select(grid_coord) %>% 
+  dplyr::filter(!grid_coord %in% grid_coordinates()) %>% 
+  dplyr::select(grid_coord) %>% 
   unique() %>%
   print(n = 100)
 
 # Finding excess coordinates "A0..40" and "J0..40"
 foci %>%
-  filter(!grid_coord %in% grid_coordinates) %>% 
-  select(grid_coord) %>% 
+  dplyr::filter(!grid_coord %in% grid_coordinates()) %>% 
+  dplyr::select(grid_coord) %>% 
   unique() %>%
-  slice(51:52)
+  dplyr::slice(51:52)
 
 # Figuring out, how frequent additional A values appear
 foci %>% 
-  filter(grid_coord == "A0..40")%>% # grid_coord == "J0..40"
-  select(lang_nr) %>% 
+  dplyr::filter(grid_coord == "A0..40")%>% # grid_coord == "J0..40"
+  dplyr::select(lang_nr) %>% 
   unique() 
 
 # 
 foci %>% 
-  filter(grid_coord == "F10..13G10..13")
+  dplyr::filter(grid_coord == "F10..13G10..13")
 
 # Discard excess coordinates from df
-dl$foci_exp <- dl$foci_exp %>% 
-  filter(grid_coord %in% grid_coordinates) %>%
-  mutate(grid_coord = as.factor(grid_coord))
+dl$foci_exp <- 
+  dl$foci_exp %>% 
+  dplyr::filter(grid_coord %in% grid_coordinates()) %>%
+  dplyr::mutate(grid_coord = as.factor(grid_coord))
 
 # Check row number
 nrow(dl$foci_exp) 
@@ -589,15 +655,17 @@ freq_NA_term_abb <- function(data){
 freq_NA_term_abb(dl$foci_exp)
 
 # Languages in foci-exp containing missing values for term_abb
-na_foci <- dl$foci_exp %>%
-    filter(is.na(term_abb)) %>% 
-    select(lang_nr) %>% 
-    distinct()
+na_foci <- function() {
+  dl$foci_exp %>%
+    dplyr::filter(is.na(term_abb)) %>% 
+    dplyr::select(lang_nr) %>% 
+    dplyr::distinct()
+}
 
 # Compare dict and foci-exp for languages containing missing values for term_abb
-setdiff(na_foci, na_lang)
-setdiff(na_lang, na_foci)
-intersect(na_foci, na_lang)
+dplyr::setdiff(na_foci(), na_lang())
+dplyr::setdiff(na_lang(), na_foci())
+dplyr::intersect(na_foci(), na_lang())
 
 ### dl$term -------------------------------------------------------------------------------------------------------------------- # 
 
@@ -607,6 +675,7 @@ my_skim(dl$term)
 # The data set is comparably large (~860,000 observations); the amount of observations of term_task should be approx the amount 
 # of speakers times amount of color chips, as every client names all 300 color chips:
 nrow(dl$term) - (length(dl$speaker$speaker_nr) * length(unique(dl$term$chip_nr)))
+
 # The deviation is quite small (+990) and it has the follwoing reason:
 
 # Find the additional observations --------------------------------------------------------------------------------------------- #
@@ -614,8 +683,8 @@ nrow(dl$term) - (length(dl$speaker$speaker_nr) * length(unique(dl$term$chip_nr))
 # Helper fun for set difference
 spls <- function(ln){
   dl$speaker %>% 
-    filter(lang_nr == ln) %>% 
-    select(speaker_nr) %>% 
+    dplyr::filter(lang_nr == ln) %>% 
+    dplyr::select(speaker_nr) %>% 
     count() %>% 
     pull()
 }
@@ -623,81 +692,88 @@ spls <- function(ln){
 # Helper fun for set difference
 splt <- function(ln){
   dl$term %>% 
-    filter(lang_nr == ln & chip_nr == 330) %>% 
-    distinct(speaker_nr) %>% 
+    dplyr::filter(lang_nr == ln & chip_nr == 330) %>% 
+    dplyr::distinct(speaker_nr) %>% 
     count() %>% 
     pull()
 }
 
 # Taking the set differences for distinct speakers in the "term.txt" and "speaker.txt" file.
-full_join(setdiff(dl$term %>% distinct(lang_nr, speaker_nr), 
-                  dl$speaker %>% distinct(lang_nr, speaker_nr)) %>% 
-            mutate(diff = "T \\ S"),
-          setdiff(dl$speaker %>% distinct(lang_nr, speaker_nr),
-                  dl$term %>% distinct(lang_nr, speaker_nr)) %>% 
-            mutate(diff = "S \\ T")) %>%
-  mutate(dig = map_int(.x = lang_nr, ~ splt(.x)),
-         dag = map_int(.x = lang_nr, ~ spls(.x)))
+dplyr::full_join(dplyr::setdiff(dl$term %>% distinct(lang_nr, speaker_nr), 
+                                dl$speaker %>% distinct(lang_nr, speaker_nr)) %>%
+                   dplyr::mutate(diff = "T \\ S"),
+                 dplyr::setdiff(dl$speaker %>% distinct(lang_nr, speaker_nr),
+                                dl$term %>% distinct(lang_nr, speaker_nr)) %>% 
+                   dplyr::mutate(diff = "S \\ T")) %>%
+  dplyr::mutate(dig = purrr::map_int(.x = lang_nr, ~ splt(.x)),
+         dag = purrr::map_int(.x = lang_nr, ~ spls(.x)))
 
 # Investigate "T \\ S" cases
 dl$term %>% 
-  filter(lang_nr == 95, speaker_nr == 26)
+  dplyr::filter(lang_nr == 95, speaker_nr == 26)
 splt(95)
+
 dl$speaker %>% 
-  filter(lang_nr == 95, speaker_nr == 26)
+  dplyr::filter(lang_nr == 95, speaker_nr == 26)
 spls(95)
 
 dl$term %>% 
-  filter(lang_nr == 97, speaker_nr == 13)
+  dplyr::filter(lang_nr == 97, speaker_nr == 13)
 splt(97)
+
 dl$speaker %>% 
-  filter(lang_nr == 97, speaker_nr == 13)
+  dplyr::filter(lang_nr == 97, speaker_nr == 13)
 spls(97)
 
 # Locating the double value
 dl$speaker %>%
-  filter(lang_nr == 97 & speaker_nr %in% c(10:15))
+  dplyr::filter(lang_nr == 97 & speaker_nr %in% c(10:15))
 
 # Correct the misspelled value
 dl$speaker <- dl$speaker %>% 
-  mutate(speaker_nr = if_else(lang_nr == 97 & speaker_nr == 12 & speaker_age == 19, 13, speaker_nr))
+  dplyr::mutate(speaker_nr = if_else(lang_nr == 97 & speaker_nr == 12 & speaker_age == 19, 13, speaker_nr))
 
 # In the summary stat all values seem in their range, except term_abb has missing values again; we can easily prove, that the
 # same problem as for foci_tas occurs:
 
 # Missing term_abb ------------------------------------------------------------------------------------------------------------- #
 
-na_term <- dl$term %>%
+na_term <- function() {
+  dl$term %>%
   filter(is.na(term_abb)) %>% 
   select(lang_nr) %>% 
-  distinct()
+  distinct() %>%
+    pull()
+}
 
-intersect(na_term, na_lang)
-setdiff(na_term, na_lang)
-setdiff(na_lang, na_term)
+intersect(na_term(), na_lang())
+setdiff(na_term(), na_lang())
+setdiff(na_lang(), na_term())
+
+purrr::map2(na_term, na_lang, c(intersect))
 
 # Frequency distribution for missing values
 freq_NA_term_abb(dl$term)
 
 # Check term_abb for missing values other then NA
 dl$term %>% 
-  select(term_abb) %>%
+  dplyr::select(term_abb) %>%
   table()
 
 dl$term %>% 
-  filter(term_abb == "*") %>%
+  dplyr::filter(term_abb == "*") %>%
   count()
 
 # Which languages are affected
 dl$term %>% 
-  filter(term_abb == "*") %>%
-  select(lang_nr) %>%
+  dplyr::filter(term_abb == "*") %>%
+  dplyr::select(lang_nr) %>%
   distinct()
 
 # Recoding NA values
 dl$term <- dl$term %>%
-  mutate(term_abb = na_if(term_abb, "*"),
-         term_abb = na_if(term_abb, "?"))
+  dplyr::mutate(term_abb = na_if(term_abb, "*"),
+                term_abb = na_if(term_abb, "?"))
 
 # Merge ************************************************************************************************************************ #
 
@@ -705,43 +781,43 @@ dl$term <- dl$term %>%
 # Overview for join ------------------------------------------------------------------------------------------------------------ #
 
 dl %>%
-  map_df(~`%in%`(table = colnames(.), x = vars$New)) %>%
-  mutate(across(where(is.logical), as.factor)) %>%
-  map_df(~ recode(., "TRUE" = "\U2713", "FALSE" = "-")) %>% 
+  purrr:map_df(~`%in%`(table = colnames(.), x = vars$New)) %>%
+  dplyr::mutate(across(where(is.logical), as.factor)) %>%
+  purrr::map_df(~ recode(., "TRUE" = "\U2713", "FALSE" = "-")) %>% 
   add_column("Variable" = vars$New) %>%
   column_to_rownames(var = "Variable")
 
 # Merge chip and mun2lab ------------------------------------------------------------------------------------------------------- #
 
 chart <- dl$mun_2_lab %>% 
-  mutate(chip_nr = as.numeric(chip_nr)) %>%
-  left_join(dl$chip, by = "chip_nr") %>%
-  select(c(1, 12, 2:11)) %>%
-  arrange(chip_nr)
+  dplyr::mutate(chip_nr = as.numeric(chip_nr)) %>%
+  dplyr::left_join(dl$chip, by = "chip_nr") %>%
+  dplyr::select(c(1, 12, 2:11)) %>%
+  dplyr::arrange(chip_nr)
 
 # Merge term and all dictionary files ------------------------------------------------------------------------------------------ #
 
 term_task <- dl$term %>%
-  left_join(dl$dict, by = c("lang_nr", "term_abb"), na_matches = "never") %>%
-  left_join(dl$speaker, by = c("lang_nr", "speaker_nr")) %>%
-  left_join(chart, by = "chip_nr") %>%
-  left_join(dl$lang, by = "lang_nr")
+  dplyr::left_join(dl$dict, by = c("lang_nr", "term_abb"), na_matches = "never") %>%
+  dplyr::left_join(dl$speaker, by = c("lang_nr", "speaker_nr")) %>%
+  dplyr::left_join(chart, by = "chip_nr") %>%
+  dplyr::left_join(dl$lang, by = "lang_nr")
 
 # Helper function for visualization
 sp25 <- function(){term_task %>% 
-    group_by(lang_nr) %>%
-    distinct(speaker_nr) %>% 
+    dplyr::group_by(lang_nr) %>%
+    dplyr::distinct(speaker_nr) %>% 
     count() %>% 
-    filter(n == 25) %>%
+    dplyr::filter(n == 25) %>%
     pull(lang_nr)
 }
 
 # Subset relevant data
 v <- term_task %>% 
-  group_by(lang_nr) %>%
+  dplyr::group_by(lang_nr) %>%
   count() %>%
-  filter(lang_nr %in% sp25()) %>%
-  mutate(cfill = as.factor(if_else(n > 8250, FALSE, TRUE)))
+  dplyr::filter(lang_nr %in% sp25()) %>%
+  dplyr::mutate(cfill = as.factor(if_else(n > 8250, FALSE, TRUE)))
 
 # Plot the Amount of chips per language with 25 speakers
 ggplot(v, aes(x = lang_nr, y = n, colour = cfill)) +  
@@ -769,36 +845,36 @@ rm_duplicates <- function(lang_dict){
 
 # Changes due to the substitution function:
 dl$dict %>%
-  group_by(lang_nr, term_abb) %>%
-  mutate(duplicate.flag = n() > 1,
+  dplyr::group_by(lang_nr, term_abb) %>%
+  dplyr::mutate(duplicate.flag = n() > 1,
          term_abb = if_else(duplicate.flag == TRUE, NA_character_, term_abb)) %>% 
-  ungroup() %>%
-  filter(lang_nr %in% c(1,42,76)) %>% 
+  dplyr::ungroup() %>%
+  dplyr::filter(lang_nr %in% c(1,42,76)) %>% 
   print(n=Inf)
 
 # Merge term with the dictionary data frames
 term_task <- dl$term %>%
-  left_join(rm_duplicates(dl$dict), by = c("lang_nr", "term_abb"), na_matches = "never") %>%
-  left_join(dl$speaker, by = c("lang_nr", "speaker_nr")) %>%
-  left_join(chart, by = "chip_nr") %>%
-  left_join(dl$lang, by = "lang_nr")
+  dplyr::left_join(rm_duplicates(dl$dict), by = c("lang_nr", "term_abb"), na_matches = "never") %>%
+  dplyr::left_join(dl$speaker, by = c("lang_nr", "speaker_nr")) %>%
+  dplyr::left_join(chart, by = "chip_nr") %>%
+  dplyr::left_join(dl$lang, by = "lang_nr")
 
 # Merge foci-exp and all dictionary files -------------------------------------------------------------------------------------- #
 
 # Same merging operation for foci-exp
 foci_task <- dl$foci_exp %>%
-  left_join(rm_duplicates(dl$dict), by = c("lang_nr", "term_abb"), na_matches = "never") %>%
-  left_join(dl$speaker, by = c("lang_nr", "speaker_nr")) %>% 
-  left_join(chart, by = "grid_coord") %>%
-  left_join(dl$lang, by = "lang_nr")
+  dplyr::left_join(rm_duplicates(dl$dict), by = c("lang_nr", "term_abb"), na_matches = "never") %>%
+  dplyr::left_join(dl$speaker, by = c("lang_nr", "speaker_nr")) %>% 
+  dplyr::left_join(chart, by = "grid_coord") %>%
+  dplyr::left_join(dl$lang, by = "lang_nr")
 
 # Check the length of the new and the old foci dfs
 nrow(foci_task) - nrow(dl$foci_exp)
 
 # Write task dfs as csv --------------------------------------------------------------------------------------------------------- #
 
-# Helper fun for printing
-make_csv <- function(df_list, df_names, path = getwd()) {
+# Helper fun for writing
+make_csv <- function(df_list, df_names, path = getwd()) { # Umbennen
   old <- getwd()
   on.exit(setwd(old), add = TRUE)
   
@@ -919,172 +995,7 @@ term_task_list <- df_list(term_task, mun = FALSE)
 # names(b) <- 1:length(b) %>% map(., ~paste("Speaker", ., sep = " "))
 
 
-# Visualization **************************************************************************************************************** #
 
-
-# Age/sex frequency distribution ----------------------------------------------------------------------------------------------- #
-
-# Plot the distribution of age and sex per age group
-dl$speaker %>%
-  mutate(speaker_age = num_speaker_age(speaker_age)) %>%
-  ggplot(aes(x = cut_width(speaker_age,10, boundary = 0), fill = speaker_sex)) +
-  geom_bar(alpha = 0.8) + 
-  labs(x = "Age Groups", y = "Frequency", fill = "Sex") +
-  scale_fill_manual(values=c("#4271AE","#FF6347"), na.value = "grey60") +
-  coord_fixed(ratio = 1/200) +
-  theme(
-    text = element_text(size = 10),
-    legend.text = element_text(size = 8),
-    legend.key.size = unit(0.5, "cm")
-  ) 
-
-# Speaker per language -------------------------------------------------------------------------------------------------------- #
-
-# Plots the amount of speaker per language and the amount of terms per language
-left_join(dl$speaker %>% group_by(lang_nr) %>% count(),
-          dl$dict %>% group_by(lang_nr) %>% count() %>% rename(m = n)) %>%
-  ggplot(aes(x = lang_nr, y = n)) +
-  geom_point(aes(size = m, colour = cut_width(m, width = 10, boundary = 0)), alpha = 0.8) +
-  #coord_flip() +
-  scale_colour_viridis_d(direction = -1) +
-  scale_x_continuous(breaks = c(0,20,40,60,80,100)) +
-  geom_hline(yintercept = mean(23.81), color="red", linetype = "dashed") +
-  labs(x = "Language", y = "Frequency", colour = "Terms per \n language") + 
-  coord_fixed(ratio = 1.5/1) +
-  theme(
-    text = element_text(size = 10),
-    legend.text = element_text(size = 8),
-    legend.position = "bottom",
-    legend.key.size = unit(0.5, "cm")
-  ) +
-  guides(size = FALSE)
-
-# Geographical distribution of the languages ----------------------------------------------------------------------------------- #
-
-# We need geospatial data (Latitude and Longitude coordinates), to assign each country a position on the coordinate system
-# Therefore we download a table which contains a list of all countries in the world and those coordinate values.
-url4 <- "https://developers.google.com/public-data/docs/canonical/countries_csv"
-file <- read_html(url4)
-tables <- html_nodes(file, "table")
-lat_long <- as_tibble(html_table(tables[[1]], fill = TRUE)) %>%
-  rename(lang_country = name,
-         lat = latitude,
-         long = longitude) %>%
-  select(-country) %>%
-  mutate(lang_country = recode(lang_country, `Côte d'Ivoire` = "Ivory Coast",
-                               `Suriname` = "Surinam",
-                               `United States` = "USA"))
-
-# We take the data from the language dictionary and merge them with their corresponding coordinate values
-wcs_iso_codes <- left_join(wcs_iso_codes, 
-                           lat_long, 
-                           by = "lang_country")
-
-# Plot the world map, which shows in which countries the survey took place and how many speakers there are per country
-left_join(wcs_iso_codes, 
-          dl$speaker) %>% 
-  group_by(lang_country, lat, long) %>% 
-  count() %>%
-  ggplot(aes(y = lat, x = long, colour = n, size = n)) +
-  geom_point(alpha = 0.65) +
-  borders("world") +
-  coord_quickmap() +
-  scale_colour_viridis_c(name = "Freq") +
-  scale_x_continuous(expand=c(0,0), 
-                     name = element_blank()) + 
-  scale_y_continuous(expand=c(0,0), 
-                     name = element_blank()) + 
-  theme_bw() +
-  theme(legend.position = "bottom") +
-  coord_fixed(1.15/1) + 
-  guides(size = FALSE)
-
-# Lab color space -------------------------------------------------------------------------------------------------------------- #
-
-# We take the Lab values for all color chips and make a special object out of them with LAB funtion
-a <- dl$mun_2_lab %>% select(7:9) 
-names(a) <- c("L", "a", "b")
-c <- LAB(a[[1]], a[[2]], a[[3]])
-
-# A 2D plot of the Lab color space for the chips
-ggplot(a, aes(x = a, y = b)) +
-  geom_point(size = 3, aes(color = hex(c, fixup = TRUE))) +
-  scale_color_identity() +
-  theme(axis.text = element_text(size = 10),
-        axis.title=element_text(size=12)) +
-  theme_bw()
-
-# A 3D plot of the Lab color space for the chips
-scatterplot3d( a[[3]], a[[2]], a[[1]], color = hex(c, fixup = TRUE), pch = 19,
-               angle =100, scale.y=0.4, xlab = "a", ylab = "b", zlab = "L")
-
-# Additional Lab plot with further perspectives
-plot(b)
-
-# Frequency distribution of color chips in the foci task -------------------------------------------------------------------------------------------------------- #
-
-# Contour plot of the freq dist as in (Kay & Regier, 2003)
-foci_task %>%
-  mutate(grid_row = as.numeric(grid_row)) %>%
-  filter(chip_nr != 141 & chip_nr != 89) %>%
-  ggplot(aes(x = grid_col, y = grid_row, z = chip_nr)) +
-  geom_density_2d_filled(alpha = 0.9, contour_var = "count") + 
-  scale_y_reverse(expand=c(0,0), breaks = 1:9, labels = paste(LETTERS[1:9])) + 
-  theme(legend.position="none",
-        panel.background = element_rect(fill = NA),
-        panel.grid.minor.x = element_line(colour="white", size=0.2),
-        panel.grid.minor.y = element_blank(),
-        panel.grid.major = element_line(colour="white", size=0.2),
-        panel.ontop = TRUE) + 
-  scale_x_continuous(expand=c(0,0), breaks = seq(0,40, 5), minor_breaks = seq(0, 40, 1)) + 
-  coord_fixed(ratio=2/1) 
-  
-# Different way of plotting it (Tile plot)
-foci_task %>%
-  mutate(grid_row = as.numeric(grid_row)) %>%
-  filter(chip_nr != 141 & chip_nr != 89) %>%
-  group_by(grid_col, grid_row) %>% 
-  count(chip_nr) %>%
-  ggplot() +
-  geom_tile(aes(x = grid_col, y = grid_row, fill = n)) +
-  scale_y_reverse(expand=c(0,0), breaks = 1:9, labels = paste(LETTERS[1:9])) + 
-  theme(legend.position = "none",
-        panel.background = element_rect(fill = NA),
-        panel.grid.minor.x = element_line(colour="white", size=0.2),
-        panel.grid.minor.y = element_blank(),
-        panel.grid.major = element_line(colour="white", size=0.2),
-        panel.ontop = TRUE) + 
-  scale_x_continuous(expand=c(0,0), breaks = seq(0,40, 5), minor_breaks = seq(0, 40, 1)) + 
-  coord_fixed(ratio=2/1) +
-  scale_fill_viridis_c()
-
-# Plotting the frequency distribution of the color chips
-p <- foci_task %>%
-  group_by(L_star, a_star, b_star) %>%
-  count(chip_nr) %>% 
-  arrange(-n) %>%
-  ungroup()
-
-q <- p %>% select(1:3) 
-
-r <- LAB(q[[1]], q[[2]], q[[3]])
-
-p %>%
-  ggplot(aes(x = reorder(chip_nr, -n), y = n)) + 
-  geom_bar(stat = "identity", fill = hex(r, fixup = TRUE)) +
-  scale_x_discrete(breaks = p$chip_nr[seq(1,330, 15)], 
-                   expand = c(0.02,0), 
-                   name = "chip_nr") +
-  scale_y_log10(breaks = c(10, 50, 200, 1000),
-                name = "Freq") +
-  theme(panel.background = element_rect(fill = "grey50", colour = NA),
-        #panel.border =      theme_rect(fill = NA, colour="grey50"), 
-        panel.grid.major =  element_blank(),
-        panel.grid.minor =  element_blank() #,
-        # plot.margin = unit(c(0.5,0.5,0.5,0.5), "cm"),
-        # plot.background = element_rect(fill = "grey60")
-  ) + 
-  coord_fixed(ratio=20/1)
 
 
 
