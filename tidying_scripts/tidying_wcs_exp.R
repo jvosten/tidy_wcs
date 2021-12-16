@@ -22,109 +22,126 @@ library(tidyverse)
 
 # Read in data ***************************************************************************************************************** #
 
-# Version 1: web --------------------------------------------------------------------------------------------------------------- #
-
-read_web <- function(){
-  # Urls for all files of interes
-  url <-"https://www1.icsi.berkeley.edu/wcs/data/20041016/WCS-Data-20110316.zip"
-  url2 <- "https://www1.icsi.berkeley.edu/wcs/data/cnum-maps/cnum-vhcm-lab-new.txt"
+read_fkt <- function() { # to do: den variable naming teil in die read_web fkt ziehen; local fkt schreiben, in der files lokal ausgelesen werden (aus dem package)
+  # Version 1: web --------------------------------------------------------------------------------------------------------------- #
   
-  # Creating temporary files
-  temp <- tempfile()
-  temp2 <- tempfile()
-  
-  # Store and unzip 
-  download.file(url, temp)
-  unzip(zipfile = temp, exdir = temp2)
-  
-  # Create a path list to the data
-  list_of_files <- list.files(path = temp2, recursive = TRUE,
-                              pattern = "\\.txt$",
-                              full.names = TRUE)
-  
-  # Read in data into a list of data frames (dfl)
-  custom_reader <- function(x){
-    if(endsWith(x, "foci-exp.txt")){
-      readr::read_table(x, col_names = FALSE)
-    }else{
-      readr::read_tsv(x, col_names = FALSE)
+  read_web <- function(){
+    # Urls for all files of interes
+    url <-"https://www1.icsi.berkeley.edu/wcs/data/20041016/WCS-Data-20110316.zip"
+    url2 <- "https://www1.icsi.berkeley.edu/wcs/data/cnum-maps/cnum-vhcm-lab-new.txt"
+    
+    # Creating temporary files
+    temp <- tempfile()
+    temp2 <- tempfile()
+    
+    # Store and unzip 
+    download.file(url, temp)
+    unzip(zipfile = temp, exdir = temp2)
+    
+    # Create a path list to the data
+    list_of_files <- list.files(path = temp2, recursive = TRUE,
+                                pattern = "\\.txt$",
+                                full.names = TRUE)
+    
+    # Read in data into a list of data frames (dfl)
+    custom_reader <- function(x){
+      if(endsWith(x, "foci-exp.txt")){
+        readr::read_table(x, col_names = FALSE)
+      }else{
+        readr::read_tsv(x, col_names = FALSE)
+      }
     }
+    
+    # Read in data into a list of data frames (dfl)
+    dl <- list_of_files %>%
+      purrr::set_names(.) %>%
+      purrr::map(., custom_reader)
+    
+    # Remove temp files 
+    unlink(c(temp, temp2), recursive = TRUE)
+    
+    # Move foci data in its own object and force it into global env
+    foci <<- dl[[4]]
+    dl <- dl[-4]
+    
+    # Read in the last txt file and add it to dfl
+    dl <- c(dl[1], 
+            list("cnum-vhcm-lab-new.txt" = readr::read_tsv(url2, col_names = FALSE)), 
+            dl[2:6])
+    # return a list object entailling df and foci
+    # list(dl, foci)
   }
   
-  # Read in data into a list of data frames (dfl)
-  dl <- list_of_files %>%
-    purrr::set_names(.) %>%
-    purrr::map(., custom_reader)
+  dl <- read_web() # kommt weg
   
-  # Remove temp files 
-  unlink(c(temp, temp2), recursive = TRUE)
+  read_local <- function() {
+    # Version 2: local ------------------------------------------------------------------------------------------------------------- #
+    
+    # # Create a path list to the data: add the path to directory you unpacked the zip in and where you stored cnum-vhcm-lab-new.txt
+    # list_of_files <- list.files(path = "./WCS_data", recursive = TRUE,
+    #                             pattern = "\\.txt$", 
+    #                             full.names = TRUE)
+    # 
+    # # Removes the readme of cnum-vhcm-lab-new.txt, if it is in the directory
+    # list_of_files <- subset(list_of_files, !endsWith(list_of_files, "README.txt"))
+    # 
+    # # Read in data into a list of data frames (dfl)
+    # dl <- list_of_files %>%
+    #   #set_names(.) %>%
+    #   map(read_tsv, col_names = FALSE) 
+    # 
+    # # Move foci data in its own object
+    # foci <- dl[[5]]
+    # dl <- dl[-5]
+    #
+    # return a list object entailling df and foci
+    # list(dl, foci)
+  }
   
-  # Move foci data in its own object and force it into global env
-  foci <<- dl[[4]]
-  dl <- dl[-4]
+  # Name all Variables of each df ------------------------------------------------------------------------------------------------ #
   
-  # Read in the last txt file and add it to dfl
-  dl <- c(dl[1], list("cnum-vhcm-lab-new.txt" = readr::read_tsv(url2, col_names = FALSE)), dl[2:6])
+  # Name each df in dfl
+  names(dl) <- c("chip", "mun_2_lab", 
+                 "dict", "foci_exp", 
+                 "lang", "speaker", 
+                 "term") 
+  
+  # set all variable names
+  colnames(dl$chip) <- c("chip_nr", "grid_row", "grid_col", 
+                         "grid_coord")
+  colnames(dl$mun_2_lab) <- c("chip_nr", "wcs_mv", "wcs_mh", 
+                              "mun_chroma", "mun_hue", "mun_value", 
+                              "L_star", "a_star", "b_star")
+  colnames(dl$dict) <- c("lang_nr", "term_nr", "term", 
+                         "term_abb")
+  colnames(dl$foci_exp) <- c("lang_nr", "speaker_nr", "focus_response", 
+                             "term_abb", "grid_coord")
+  colnames(dl$lang) <- c("lang_nr", "lang_name", "lang_country", 
+                         "field_worker", "field_worker_2", "field_worker_3", 
+                         "Orig_file", "File_type")
+  colnames(dl$speaker) <- c("lang_nr", "speaker_nr", "speaker_age", 
+                            "speaker_sex") 
+  colnames(dl$term) <- c("lang_nr", "speaker_nr", "chip_nr", 
+                         "term_abb")
+  
+  # colnames for the additional foci file
+  colnames(foci) <- c("lang_nr", "speaker_nr", "focus_response", 
+                             "term_abb", "grid_coord")
+  
+  # Two data frames had column names, which turned into the first row now; we delete them
+  dl$mun_2_lab <- dl$mun_2_lab[-1,]
+  dl$dict <- dl$dict[-1,]
+  
+  # Empty list for plots
+  plots <- list()
+  #####
+  # if(local = TRUE) {
+  #   read_local() } else {
+  #     read_web()
+  #   }
 }
 
-dl <- read_web()
-
-# Version 2: local ------------------------------------------------------------------------------------------------------------- #
-
-# # Create a path list to the data: add the path to directory you unpacked the zip in and where you stored cnum-vhcm-lab-new.txt
-# list_of_files <- list.files(path = "./WCS_data", recursive = TRUE,
-#                             pattern = "\\.txt$", 
-#                             full.names = TRUE)
-# 
-# # Removes the readme of cnum-vhcm-lab-new.txt, if it is in the directory
-# list_of_files <- subset(list_of_files, !endsWith(list_of_files, "README.txt"))
-# 
-# # Read in data into a list of data frames (dfl)
-# dl <- list_of_files %>%
-#   #set_names(.) %>%
-#   map(read_tsv, col_names = FALSE) 
-# 
-# # Move foci data in its own object
-# foci <- dl[[5]]
-# dl <- dl[-5]
-
-# Name all Variables of each df ------------------------------------------------------------------------------------------------ #
-
-# Name each df in dfl
-names(dl) <- c("chip", "mun_2_lab", 
-               "dict", "foci_exp", 
-               "lang", "speaker", 
-               "term") 
-
-# set all variable names
-colnames(dl$chip) <- c("chip_nr", "grid_row", "grid_col", 
-                       "grid_coord")
-colnames(dl$mun_2_lab) <- c("chip_nr", "wcs_mv", "wcs_mh", 
-                            "mun_chroma", "mun_hue", "mun_value", 
-                            "L_star", "a_star", "b_star")
-colnames(dl$dict) <- c("lang_nr", "term_nr", "term", 
-                       "term_abb")
-colnames(dl$foci_exp) <- c("lang_nr", "speaker_nr", "focus_response", 
-                           "term_abb", "grid_coord")
-colnames(dl$lang) <- c("lang_nr", "lang_name", "lang_country", 
-                       "field_worker", "field_worker_2", "field_worker_3", 
-                       "Orig_file", "File_type")
-colnames(dl$speaker) <- c("lang_nr", "speaker_nr", "speaker_age", 
-                          "speaker_sex") 
-colnames(dl$term) <- c("lang_nr", "speaker_nr", "chip_nr", 
-                       "term_abb")
-
-# colnames for the additional foci file
-colnames(foci) <- c("lang_nr", "speaker_nr", "focus_response", 
-                           "term_abb", "grid_coord")
-
-# Two data frames had column names, which turned into the first row now; we delete them
-dl$mun_2_lab <- dl$mun_2_lab[-1,]
-dl$dict <- dl$dict[-1,]
-
-# Empty list for plots
-plots <- list()
-
+#c(dl, foci) %<-% read_fkt() 
 # Overview on variable description --------------------------------------------------------------------------------------------- #
 
 vars <- tibble::tibble("WCS Variable Name" = c("WCS Chip Number", "WCS Grid Row", "WCS Grid Columns", "Concatenation of fields", #1
