@@ -17,40 +17,58 @@ library(tidyverse)
 # Read in data ***************************************************************************************************************** #
 
 
-# Version 1 -------------------------------------------------------------------------------------------------------------------- #
+# Web -------------------------------------------------------------------------------------------------------------------------- #
 
-# Urls for all files of interes
-url <-"https://www1.icsi.berkeley.edu/wcs/data/20041016/WCS-Data-20110316.zip"
-url2 <- "https://www1.icsi.berkeley.edu/wcs/data/cnum-maps/cnum-vhcm-lab-new.txt"
+read_web <- function(){
+  # Urls for all files of interes
+  url <-"https://www1.icsi.berkeley.edu/wcs/data/20041016/WCS-Data-20110316.zip"
+  url2 <- "https://www1.icsi.berkeley.edu/wcs/data/cnum-maps/cnum-vhcm-lab-new.txt"
+  
+  # Creating temporary files
+  temp <- tempfile()
+  temp2 <- tempfile()
+  
+  # Store and unzip 
+  download.file(url, temp)
+  unzip(zipfile = temp, exdir = temp2)
+  
+  # Create a path list to the data
+  list_of_files <- list.files(path = temp2, recursive = TRUE,
+                              pattern = "\\.txt$",
+                              full.names = TRUE)
+  
+  # Read in data into a list of data frames (dfl)
+  custom_reader <- function(x){
+    if(endsWith(x, "foci-exp.txt")){
+      readr::read_table(x, col_names = FALSE)
+    }else{
+      readr::read_tsv(x, col_names = FALSE)
+    }
+  }
+  
+  # Read in data into a list of data frames (dfl)
+  dl <- list_of_files %>%
+    purrr::set_names(.) %>%
+    purrr::map(., custom_reader)
+  
+  # Remove temp files 
+  unlink(c(temp, temp2), recursive = TRUE)
+  
+  # Move foci data in its own object and force it into global env
+  foci <<- dl[[4]]
+  dl <- dl[-4]
+  
+  # Read in the last txt file and add it to dfl
+  dl <- c(dl[1], 
+          list("cnum-vhcm-lab-new.txt" = readr::read_tsv(url2, col_names = FALSE)), 
+          dl[2:6])
+  # return a list object entailling df and foci
+  # list(dl, foci)
+}
 
-# Creating temporary files
-temp <- tempfile()
-temp2 <- tempfile()
+dl <- read_web()
 
-# Store and unzip 
-download.file(url, temp)
-unzip(zipfile = temp, exdir = temp2)
-
-# Create a path list to the data
-list_of_files <- list.files(path = temp2, recursive = TRUE,
-                            pattern = "\\.txt$",
-                            full.names = TRUE)
-
-# Read in data into a list of data frames (dfl)
-dl <- list_of_files %>%
-  purrr::map(readr::read_tsv, col_names = FALSE)
-
-# Remove temp files 
-unlink(c(temp, temp2))
-
-# Move foci data in its own object
-foci <- dl[[4]]
-dl <- dl[-4]
-
-# Read in the last txt file and add it to dfl
-dl <- c(dl[1], list("cnum-vhcm-lab-new.txt" = readr::read_tsv(url2, col_names = FALSE)), dl[2:6])
-
-# Version 2 -------------------------------------------------------------------------------------------------------------------- #
+# Local ------------------------------------------------------------------------------------------------------------------------ #
 
 # # Create a path list to the data: add the path to directory you unpacked the zip in and where you stored cnum-vhcm-lab-new.txt
 # list_of_files <- list.files(path = "./wcs_data", recursive = TRUE,
@@ -147,8 +165,8 @@ dl$chip <- dl$chip %>%
 
 # Make all vars numeric or factor
 dl$mun_2_lab <- dl$mun_2_lab %>%
-  dplyr::mutate(across(!c(wcs_mv, mun_hue), as.numeric),
-                across(c(wcs_mv, mun_hue), as.factor))
+  dplyr::mutate(dplyr::across(!c(wcs_mv, mun_hue), as.numeric),
+                dplyr::across(c(wcs_mv, mun_hue), as.factor))
 
 ## dl$lang ---------------------------------------------------------------------------------------------------------------------- # 
 
@@ -162,25 +180,34 @@ dl$lang <- dl$lang %>%
 # lang_country with values from that file.
 
 # Downloading the additional table, transforming the html table into R data frame 
-url3 <- "https://www1.icsi.berkeley.edu/wcs/WCS_SIL_codes.html"
-file <- xml2::read_html(url3)
-tables <- rvest::html_nodes(file, "table")
-wcs_iso_codes <- as_tibble(rvest::html_table(tables[[1]], fill = TRUE)) %>%
-  dplyr::rename(lang_nr = Index, 
-                lang_name = Language, 
-                iso_693 = `ISO 639-3 Code`, 
-                family = Family, 
-                lang_country = `Country Where`) %>%
-  dplyr::mutate(lang_country = recode(lang_country, `Mexico|` = "Mexico",
-                                      `Columbia` = "Colombia",
-                                      `Indonesia (Irian Jaya)` = "Indonesia",
-                                      `Peru, Brazil` = "Peru",
-                                      `USA, Mexico` = "Mexico",
-                                      `Nigeria, Cameroon` = "Nigeria"))
+wcs_iso_codes <- function() {  
+  url3 <- "https://www1.icsi.berkeley.edu/wcs/WCS_SIL_codes.html"
+  file <- xml2::read_html(url3)
+  tables <- rvest::html_nodes(file, "table")
+  
+  codes <- 
+    tibble::as_tibble(rvest::html_table(tables[[1]], 
+                                        fill = TRUE)) %>%
+    dplyr::rename(lang_nr = Index, 
+                  lang_name = Language, 
+                  iso_693 = `ISO 639-3 Code`, 
+                  family = Family, 
+                  lang_country = `Country Where`) %>%
+    dplyr::mutate(lang_country = dplyr::recode(lang_country, 
+                                               `Mexico|` = "Mexico",
+                                               `Columbia` = "Colombia",
+                                               `Indonesia (Irian Jaya)` = "Indonesia",
+                                               `Peru, Brazil` = "Peru",
+                                               `USA, Mexico` = "Mexico",
+                                               `Nigeria, Cameroon` = "Nigeria")
+    )
+  return(codes)
+}
 
-# Substitute the variables
-dl$lang <- wcs_iso_codes %>%
+# Substitute the data frames
+dl$lang <- wcs_iso_codes() %>%
   dplyr::select(lang_nr, lang_name, lang_country)
+
 
 ## dl$speaker ------------------------------------------------------------------------------------------------------------------- # 
 
@@ -204,7 +231,7 @@ dl$speaker <- dl$speaker %>%
                                  speaker_age == "X" ~ NA_character_,
                                  TRUE ~ speaker_age))
 
-# There is a spelling mistake in lnag 97; there exists a speaker 12 twice but no speaker 13:
+# There is a spelling mistake in lang 97; there exists a speaker 12 twice but no speaker 13:
 dl$speaker %>%
   dplyr::filter(lang_nr == 97 & speaker_nr %in% c(10:15))
 
@@ -220,45 +247,48 @@ dl$dict <- dl$dict %>%
 
 # Deal with missing values and falsely named vars
 dl$dict <- dl$dict %>%  
-  dplyr::mutate(term_abb = case_when( term == "'ndaa" ~ "ND", # This recodes the missing term_abb which have a corresponding term
-                                      term == "namonsitihante" ~ "NM",
-                                      term == "naatuca" ~ "NT",
-                                      term == "anaranjada/naranjada" ~ "AN",
-                                      term == "naranjana" ~ "NR",
-                                      term == "néng2/niáng2" ~ "NE",
-                                      term == "naranjado" ~ "NR",
-                                      term == "najerona" ~ "NJ",
-                                      term == "narane" ~ "NR",
-                                      term == "nilea" ~ "NI",
-                                      term == "naranjada" ~ "NR",
-                                      term == "cana" ~ "CA",
-                                      term == "naraja" ~ "NR",
-                                      term == "ñagla" ~ "NG",
-                                      term == "namaal" ~ "NM",
-                                      term == "ñiro" ~ "NI",
-                                      TRUE ~ term_abb),
-                 # This cleans the terms, which are missing
-                 term = case_when(term == "??" ~ NA_character_,
-                                  term == "blank" ~ NA_character_,
-                                  TRUE ~ term),
-                 # this cleans the two term_abb, which are '??'
-                 term_abb = case_when(term == is.na(term) ~ NA_character_,
-                                      term == "welee" ~ "WE",
-                                      term_abb == "??" ~ NA_character_,
-                                      TRUE ~ term_abb)
-          )   
+  dplyr::mutate(term_abb = dplyr::case_when(term == "'ndaa" ~ "ND", # This recodes the missing term_abb which have a corresponding term
+                                            term == "namonsitihante" ~ "NM",
+                                            term == "naatuca" ~ "NT",
+                                            term == "anaranjada/naranjada" ~ "AN",
+                                            term == "naranjana" ~ "NR",
+                                            term == "néng2/niáng2" ~ "NE",
+                                            term == "naranjado" ~ "NR",
+                                            term == "najerona" ~ "NJ",
+                                            term == "narane" ~ "NR",
+                                            term == "nilea" ~ "NI",
+                                            term == "naranjada" ~ "NR",
+                                            term == "cana" ~ "CA",
+                                            term == "naraja" ~ "NR",
+                                            term == "ñagla" ~ "NG",
+                                            term == "namaal" ~ "NM",
+                                            term == "ñiro" ~ "NI",
+                                            TRUE ~ term_abb),
+                # This cleans the terms, which are missing
+                term = dplyr::case_when(term == "??" ~ NA_character_,
+                                        term == "blank" ~ NA_character_,
+                                        TRUE ~ term),
+                # this cleans the two term_abb, which are '??'
+                term_abb = dplyr::case_when(term == is.na(term) ~ NA_character_,
+                                            term == "welee" ~ "WE",
+                                            term_abb == "??" ~ NA_character_,
+                                            TRUE ~ term_abb)
+  )    
 
 ## dl$foci_exp ------------------------------------------------------------------------------------------------------------------ # 
 
 # Creates a vector with the grid coordinates of the Munsell chart
-grid_coordinates <- LETTERS[2:9] %>%
-  purrr::map(paste0, 0:40) %>% 
-  purrr::flatten_chr() %>% 
-  c("A0", ., "J0")
+grid_coordinates <- function() {
+  LETTERS[2:9] %>%
+    purrr::map(paste0, 0:40) %>% 
+    purrr::flatten_chr() %>% 
+    c("A0", ., "J0")
+}
 
 # Discard excess coordinates from foci_exp
-dl$foci_exp <- dl$foci_exp %>% 
-  dplyr::filter(grid_coord %in% grid_coordinates) %>%
+dl$foci_exp <- 
+  dl$foci_exp %>% 
+  dplyr::filter(grid_coord %in% grid_coordinates()) %>%
   dplyr::mutate(grid_coord = as.factor(grid_coord))
 
 ## dl$term ---------------------------------------------------------------------------------------------------------------------- # 
