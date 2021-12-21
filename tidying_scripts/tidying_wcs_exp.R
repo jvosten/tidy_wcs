@@ -806,11 +806,13 @@ dl %>%
 
 # Merge chip and mun2lab ------------------------------------------------------------------------------------------------------- #
 
-chart <- dl$mun_2_lab %>% 
-  dplyr::mutate(chip_nr = as.numeric(chip_nr)) %>%
-  dplyr::left_join(dl$chip, by = "chip_nr") %>%
-  dplyr::select(c(1, 12, 2:11)) %>%
-  dplyr::arrange(chip_nr)
+chart <- function() {
+  dl$mun_2_lab %>% # grid row & col aus chip sind möglw unnötig
+    dplyr::mutate(chip_nr = as.numeric(chip_nr)) %>%
+    dplyr::left_join(dl$chip, by = "chip_nr") %>%
+    dplyr::select(c(1, 12, 2:11)) %>%
+    dplyr::arrange(chip_nr)
+}
 
 # Merge term and all dictionary files ------------------------------------------------------------------------------------------ #
 
@@ -870,20 +872,34 @@ dl$dict %>%
   print(n=Inf)
 
 # Merge term with the dictionary data frames
-term_task <- dl$term %>%
-  dplyr::left_join(rm_duplicates(dl$dict), by = c("lang_nr", "term_abb"), na_matches = "never") %>%
-  dplyr::left_join(dl$speaker, by = c("lang_nr", "speaker_nr")) %>%
-  dplyr::left_join(chart, by = "chip_nr") %>%
-  dplyr::left_join(dl$lang, by = "lang_nr")
+term_task <- function() {
+  dl$term %>%
+    dplyr::left_join(rm_duplicates(dl$dict), 
+                     by = c("lang_nr", "term_abb"),
+                     na_matches = "never") %>%
+    dplyr::left_join(dl$speaker, 
+                     by = c("lang_nr", "speaker_nr")) %>%
+    dplyr::left_join(chart(), 
+                     by = "chip_nr") %>%
+    dplyr::left_join(dl$lang, 
+                     by = "lang_nr")
+} 
 
 # Merge foci-exp and all dictionary files -------------------------------------------------------------------------------------- #
 
 # Same merging operation for foci-exp
-foci_task <- dl$foci_exp %>%
-  dplyr::left_join(rm_duplicates(dl$dict), by = c("lang_nr", "term_abb"), na_matches = "never") %>%
-  dplyr::left_join(dl$speaker, by = c("lang_nr", "speaker_nr")) %>% 
-  dplyr::left_join(chart, by = "grid_coord") %>%
-  dplyr::left_join(dl$lang, by = "lang_nr")
+foci_task <- function() {
+  dl$foci_exp %>%
+    dplyr::left_join(rm_duplicates(dl$dict), 
+                     by = c("lang_nr", "term_abb"), 
+                     na_matches = "never") %>%
+    dplyr::left_join(dl$speaker, 
+                     by = c("lang_nr", "speaker_nr")) %>% 
+    dplyr::left_join(chart(), 
+                     by = "grid_coord") %>%
+    dplyr::left_join(dl$lang, 
+                     by = "lang_nr")
+}
 
 # Check the length of the new and the old foci dfs
 nrow(foci_task) - nrow(dl$foci_exp)
@@ -914,7 +930,6 @@ make_csv(dl, names(dl), "./data/new")
 
 
 # ML functions ***************************************************************************************************************** #
-
 
 # General preprocessing -------------------------------------------------------------------------------------------------------- #
 
