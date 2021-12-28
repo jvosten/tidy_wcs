@@ -259,7 +259,7 @@ ui <- fluidPage(
                                         WCS Archive.")),
                                br(),
                                h5(p("I hope you find it interesting and/or useful.  Any comments or questions are welcome at 21955156+jvosten@users.noreply.github.com"),
-                                  p("The source code for this Shiny app is available soon ", a("on github", href = "https://github.com/gpilgrim2670/SwimMap"), "."))
+                                  p("The source code for this Shiny app is available ", a("on github", href = "https://github.com/jvosten/tidy_wcs/tree/master/app"), "."))
                                
                                #hr(),
                                
