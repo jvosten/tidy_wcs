@@ -57,6 +57,8 @@ For installing a local copy of the project just follow these simple implementati
    ```   
 3. The WCS app will open in your browser
 
+Alternatively the app is currently hosted under <https://jvosten.shinyapps.io/wcs_app/>
+
 ## Interactive script
 
 Furthermore the repo contains two interactive `R` scripts in `scripts/`
