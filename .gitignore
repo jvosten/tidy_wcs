@@ -1,6 +1,8 @@
 ### Project related #################################################################
-app/
+app/rsconnect
+app/app_old.R
 README.html
+.DS_Store 
 
 ### R related #######################################################################
 # History files

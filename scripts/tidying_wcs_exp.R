@@ -16,9 +16,6 @@ library(xml2)
 library(tidymodels)
 library(tidyverse)
 
-# setwd("./WCS_Data")
-# library(here)
-
 
 # Read in data ***************************************************************************************************************** #
 

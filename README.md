@@ -1,5 +1,7 @@
 <!-- README.md for WCS git repo -->
 
+# tidy WCS
+
 <!-- PROJECT LOGO -->
 <br>
 <br>
@@ -17,7 +19,7 @@ This is work-in-progress repo aims to facilitate access to the data of the [WCS 
 <!-- GETTING STARTED 
 
 
-### Installation
+## Installation
 
 1. Clone the repo
    ```sh
